@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finanzio — Gestão Financeira Inteligente</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <!-- Firebase SDK v8 compat -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- Estilos Customizados -->
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Módulos de Inicialização e Configuração -->
+  <script src="js/config.js"></script>
+</head>
+<body class="bg-slate-50 dark:bg-[#0b0f19] text-slate-800 dark:text-slate-100 font-sans antialiased h-screen overflow-hidden flex flex-col md:flex-row select-none">
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside id="sidebar" class="w-64 bg-white dark:bg-[#111827] border-r border-slate-200 dark:border-slate-800/80 flex flex-col shrink-0 h-full transition-all duration-300 z-30 fixed md:relative -translate-x-full md:translate-x-0">
+    <div class="h-16 flex items-center justify-between px-5 border-b border-slate-100 dark:border-slate-800/60">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        </div>
+        <div class="sidebar-text flex flex-col">
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">Finanzio</span>
+          <span class="text-[10px] uppercase tracking-wider font-semibold text-emerald-600 dark:text-brand-400">Pro Edition</span>
+        </div>
+      </div>
+      <button onclick="toggleSidebarCollapse()" class="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-base" title="Recolher menu">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+      </button>
+      <button onclick="toggleMobileSidebar()" class="md:hidden p-1.5 text-slate-400 hover:text-slate-600">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+      <div>
+        <span class="sidebar-text px-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">Visão Geral</span>
+        <nav class="space-y-1">
+          <button onclick="switchScreen('dashboard')" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            <span class="sidebar-text">Dashboard</span>
+          </button>
+          <button onclick="switchScreen('transactions')" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-brand-600 bg-brand-50/80 dark:bg-brand-500/10 dark:text-brand-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            <span class="sidebar-text">Lançamentos</span>
+            <span class="ml-auto text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400" id="tx-badge-count">0</span>
+          </button>
+          <button onclick="switchScreen('budgets')" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+            <span class="sidebar-text">Orçamentos</span>
+          </button>
+          <button onclick="switchScreen('goals')" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+            <span class="sidebar-text">Metas Financeiras</span>
+          </button>
+        </nav>
+      </div>
+
+      <div>
+        <span class="sidebar-text px-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-2">Gestão & Contas</span>
+        <nav class="space-y-1">
+          <button onclick="switchScreen('accounts')" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span class="sidebar-text">Contas & Cartões</span>
+          </button>
+          <button onclick="switchScreen('categories')" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+            <span class="sidebar-text">Categorias</span>
+          </button>
+          <button onclick="switchScreen('reports')" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-colors text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            <span class="sidebar-text">Relatórios & BI</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Sidebar Bottom Actions -->
+    <div class="p-3 border-t border-slate-100 dark:border-slate-800/60 space-y-1">
+      <div class="flex items-center gap-1">
+        <button onclick="exportJSONBackup()" class="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Exportar Backup JSON">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span class="sidebar-text">Backup</span>
+        </button>
+        <button onclick="document.getElementById('import-file-input').click()" class="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Restaurar Backup JSON">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          <span class="sidebar-text">Restaurar</span>
+        </button>
+        <input type="file" id="import-file-input" class="hidden" accept=".json" onchange="importJSONBackup(event)">
+      </div>
+
+      <button onclick="toggleTheme()" class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <div class="flex items-center gap-3">
+          <span id="theme-btn-icon">
+            <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </span>
+          <span class="sidebar-text">Modo Escuro</span>
+        </div>
+        <div class="w-7 h-4 bg-slate-300 dark:bg-brand-500/80 rounded-full p-0.5 flex items-center transition-colors">
+          <div class="w-3 h-3 rounded-full bg-white transition-transform translate-x-3 dark:translate-x-3" id="theme-toggle-dot"></div>
+        </div>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Mobile Backdrop -->
+  <div id="mobile-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-20 hidden md:hidden"></div>
+
+  <!-- MAIN APPLICATION VIEWPORT -->
+  <div class="flex-1 flex flex-col h-full overflow-hidden">
+    
+    <!-- Top Header Bar -->
+    <header class="relative h-16 px-4 md:px-8 border-b border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-[#111827]/70 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
+      <div class="flex items-center gap-3 z-10">
+        <button onclick="toggleMobileSidebar()" class="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 dark:text-white" id="page-title">Livro de Lançamentos</h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Controle financeiro pessoal </p>
+        </div>
+      </div>
+
+      <!-- CENTRO: Alternador de Data -->
+      <div id="header-period-controls" class="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+        <button onclick="changeTxPeriod(-1)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors" title="Mês Anterior">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div class="relative">
+          <button onclick="toggleMonthPickerDropdown()" class="px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <span id="tx-current-period-display">Maio 2026</span>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          
+          <div id="month-picker-dropdown" class="hidden absolute left-1/2 -translate-x-1/2 mt-1 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-30 p-2 space-y-1">
+            <div class="grid grid-cols-3 gap-1 text-[11px] font-semibold text-center" id="quick-month-selector"></div>
+          </div>
+        </div>
+        <button onclick="changeTxPeriod(1)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors" title="Próximo Mês">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- Direita: Ações Rápidas -->
+      <div class="flex items-center gap-2 z-10">
+        <div id="header-action-button-container" class="relative">
+          <button onclick="toggleNewActionMenu()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold transition-all shadow-md shadow-brand-500/20">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            <span>Novo</span>
+            <svg class="w-3.5 h-3.5 text-white/80" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+
+          <div id="new-action-menu" class="hidden absolute right-0 mt-1.5 w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-1.5 z-40 space-y-1 animate-in fade-in zoom-in duration-150">
+            <button onclick="openModal('expense'); toggleNewActionMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+              <span>Despesa</span>
+            </button>
+            <button onclick="openModal('income'); toggleNewActionMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+              <span>Receita</span>
+            </button>
+            <button onclick="openModal('transfer'); toggleNewActionMenu();" class="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg transition-colors">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+              <span>Transferência</span>
+            </button>
+          </div>
+        </div>
+
+        <button id="header-filter-btn" onclick="document.getElementById('tx-filter-bar-container').classList.toggle('hidden')" class="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Alternar Filtros">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+        </button>
+
+        <button onclick="exportQuickStatement()" class="p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Imprimir Relatório">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Scrollable Work Area -->
+    <main class="flex-1 overflow-y-auto px-4 md:px-8 py-3 space-y-4">
+
+      <!-- 1. SCREEN: DASHBOARD -->
+      <section id="screen-dashboard" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Receitas do Mês</span>
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+              </div>
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400" id="dash-receitas-val">R$ 0,00</h3>
+              <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                <span id="dash-receitas-count">0 recebidas</span>
+                <span class="text-slate-500 font-medium" id="dash-receitas-prev">Previsto: R$ 0,00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Despesas do Mês</span>
+              <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center text-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+              </div>
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-2xl font-bold tracking-tight text-rose-600 dark:text-rose-400" id="dash-despesas-val">R$ 0,00</h3>
+              <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                <span id="dash-despesas-count">0 pagas</span>
+                <span class="text-slate-500 font-medium" id="dash-despesas-prev">Previsto: R$ 0,00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Resultado Líquido</span>
+              <div class="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center text-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+              </div>
+            </div>
+            <div class="space-y-1">
+              <h3 class="text-2xl font-bold tracking-tight" id="dash-saldo-val">R$ 0,00</h3>
+              <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                <span>Saldo realizado</span>
+                <span class="text-slate-500 font-medium" id="dash-saldo-prev">Previsto: R$ 0,00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg> Fluxo de Caixa Anual (2026)
+                  </h3>
+                  <p class="text-xs text-slate-400">Comparativo mês a mês de entradas vs saídas</p>
+                </div>
+                <button onclick="switchScreen('reports')" class="text-xs font-medium text-brand-600 hover:text-brand-500 flex items-center gap-1">
+                  Ver Relatório →
+                </button>
+              </div>
+              <div class="h-64 w-full">
+                <canvas id="flowCanvas"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Últimos Lançamentos
+                  </h3>
+                  <p class="text-xs text-slate-400">Transações recentes do período</p>
+                </div>
+                <button onclick="switchScreen('transactions')" class="text-xs font-medium text-brand-600 hover:text-brand-500 flex items-center gap-1">
+                  Ver Todos →
+                </button>
+              </div>
+              <div class="divide-y divide-slate-100 dark:divide-slate-800" id="dash-recent-tx"></div>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white">Maiores Gastos</h3>
+                <span class="text-xs text-slate-400">Por categoria</span>
+              </div>
+              <div class="h-44 relative flex items-center justify-center">
+                <canvas id="gastosDonutCanvas"></canvas>
+              </div>
+              <div class="mt-4 space-y-2" id="dash-gastos-legend"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. SCREEN: TRANSACTIONS -->
+      <section id="screen-transactions" class="space-y-3 pt-0">
+        
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs flex items-center justify-between">
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Receitas</span>
+              <h4 class="text-lg font-bold text-emerald-600 dark:text-emerald-400" id="tx-summary-inc-val">R$ 0,00</h4>
+              <span class="text-[10px] text-slate-400" id="tx-summary-inc-prev">Previsto: R$ 0,00</span>
+            </div>
+            <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs flex items-center justify-between">
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Despesas</span>
+              <h4 class="text-lg font-bold text-rose-600 dark:text-rose-400" id="tx-summary-exp-val">R$ 0,00</h4>
+              <span class="text-[10px] text-slate-400" id="tx-summary-exp-prev">Previsto: R$ 0,00</span>
+            </div>
+            <div class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+            </div>
+          </div>
+
+          <div id="tx-summary-balance-card" class="bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs flex items-center justify-between transition-colors">
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Saldo do Período</span>
+              <h4 class="text-lg font-bold" id="tx-summary-bal-val">R$ 0,00</h4>
+              <span class="text-[10px] text-slate-400" id="tx-summary-bal-prev">Previsto: R$ 0,00</span>
+            </div>
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center" id="tx-summary-bal-icon-wrap">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+            </div>
+          </div>
+        </div>
+        
+        <!--Filter Bar-->
+        <div id="tx-filter-bar-container" class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 shadow-sm">
+          <div class="flex items-center justify-between gap-2 overflow-x-auto text-xs text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="font-medium text-[10px] text-slate-400 uppercase tracking-wider shrink-0">Filtrar:</span>
+              <select id="tx-filter-type" onchange="renderTransactionsList()" class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium">
+                <option value="all">Todos os tipos</option>
+                <option value="income">Apenas Receitas</option>
+                <option value="expense">Apenas Despesas</option>
+                <option value="transfer">Transferências</option>
+              </select>
+              <select id="tx-filter-status" onchange="renderTransactionsList()" class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium">
+                <option value="all">Todos os status</option>
+                <option value="paid">Pagas / Recebidas</option>
+                <option value="pending">Pendentes</option>
+              </select>
+              <select id="tx-filter-account" onchange="renderTransactionsList()" class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium">
+                <option value="all">Todas as Contas</option>
+              </select>
+              <select id="tx-filter-category" onchange="renderTransactionsList()" class="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium">
+                <option value="all">Todas as Categorias</option>
+              </select>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0 ml-auto">
+              <button onclick="printFilteredReport()" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors" title="Gerar Relatório dos Itens Filtrados">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+              </button>
+              <button onclick="printPeriodReport()" class="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors" title="Gerar Relatório Geral do Mês">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="tx-grouped-container" class="space-y-3"></div>
+      </section>
+
+      <!-- SCREEN: ORÇAMENTOS -->
+      <section id="screen-budgets" class="hidden space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Orçamentos Mensais Vivos</h2>
+            <p class="text-xs text-slate-400">Limites vinculados às categorias. Gastos calculados automaticamente pelos lançamentos.</p>
+          </div>
+          <button onclick="openBudgetModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> Novo Orçamento
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="budgets-full-grid"></div>
+      </section>
+
+      <!-- SCREEN: METAS -->
+      <section id="screen-goals" class="hidden space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Metas & Reservas</h2>
+            <p class="text-xs text-slate-400">Sonhos de médio e longo prazo com acompanhamento progressivo</p>
+          </div>
+          <button onclick="openGoalModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> Nova Meta
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="goals-full-grid"></div>
+      </section>
+
+      <!-- SCREEN: CONTAS -->
+      <section id="screen-accounts" class="hidden space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Contas Bancárias & Cartões</h2>
+            <p class="text-xs text-slate-400">Saldos calculados dinamicamente através do histórico</p>
+          </div>
+          <button onclick="openAccountModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> Nova Conta / Cartão
+          </button>
+        </div>
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Contas Bancárias</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="accounts-banks-grid"></div>
+        </div>
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Cartões de Crédito</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="accounts-cards-grid"></div>
+        </div>
+      </section>
+
+      <!-- SCREEN: CATEGORIAS -->
+      <section id="screen-categories" class="hidden space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Categorias</h2>
+            <p class="text-xs text-slate-400">Personalize ícones e cores para organizar seus lançamentos</p>
+          </div>
+          <button onclick="openCategoryModal()" class="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> Nova Categoria
+          </button>
+        </div>
+        <div class="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+          <button onclick="switchCategoryTab('expense')" id="cat-tab-expense" class="px-4 py-2 rounded-xl text-xs font-bold bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
+            Categorias de Despesa
+          </button>
+          <button onclick="switchCategoryTab('income')" id="cat-tab-income" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+            Categorias de Receita
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" id="categories-grid"></div>
+      </section>
+
+      <!-- SCREEN: RELATÓRIOS -->
+      <section id="screen-reports" class="hidden space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 dark:text-white">Relatórios & Análise</h2>
+            <p class="text-xs text-slate-400">Métricas analíticas detalhadas de receitas, despesas e patrimônio</p>
+          </div>
+          <button onclick="exportQuickStatement()" class="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg> Imprimir / PDF
+          </button>
+        </div>
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+          <div class="h-72 w-full">
+            <canvas id="reportComparisonCanvas"></canvas>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- DRAWER -->
+  <div id="drawer-backdrop" onclick="closeDrawer()" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+  <aside id="drawer" class="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-[#111827] border-l border-slate-200 dark:border-slate-800 z-50 transform translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+    <div class="h-16 px-6 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span id="drawer-type-badge" class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider">Despesa</span>
+        <span class="text-xs text-slate-400" id="drawer-id-label">#ID</span>
+      </div>
+      <button onclick="closeDrawer()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-6 space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Descrição</label>
+        <input type="text" id="drawer-title" class="w-full text-base font-bold bg-transparent border-b border-slate-200 dark:border-slate-700 py-1 text-slate-900 dark:text-white focus:outline-none focus:border-brand-500">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Valor (R$)</label>
+          <input type="text" id="drawer-amount" oninput="formatCurrencyInput(this)" class="w-full text-lg font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data</label>
+          <input type="date" id="drawer-date" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Conta / Cartão</label>
+          <select id="drawer-account" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Categoria</label>
+          <select id="drawer-category" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500"></select>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status de Pagamento</label>
+        <div class="flex gap-2">
+          <button type="button" onclick="setDrawerPaidStatus(true)" id="drawer-btn-paid" class="flex-1 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg> Pago
+          </button>
+          <button type="button" onclick="setDrawerPaidStatus(false)" id="drawer-btn-unpaid" class="flex-1 py-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg> Pendente
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observações</label>
+        <textarea id="drawer-obs" rows="3" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none" placeholder="Adicionar notas ou detalhes..."></textarea>
+      </div>
+    </div>
+
+    <div class="p-5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-3">
+      <button onclick="deleteDrawerTransaction()" class="p-2.5 rounded-xl border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs font-semibold flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg> Excluir
+      </button>
+      <div class="flex items-center gap-2">
+        <button onclick="closeDrawer()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          Cancelar
+        </button>
+        <button onclick="saveDrawerTransaction()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold shadow-sm">
+          Salvar
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MODAL NOVO LANÇAMENTO -->
+  <div id="modal-tx" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-[#111726] border border-slate-800/90 rounded-2xl w-full max-w-[390px] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+      
+      <div class="pt-5 px-5 pb-3">
+        <h3 class="text-sm font-bold text-white tracking-wide" id="modal-tx-heading">
+          Nova Despesa
+        </h3>
+      </div>
+
+      <div class="px-5 pb-5 space-y-3.5">
+        <div class="flex p-1 bg-[#1a2336] rounded-xl text-xs font-semibold">
+          <button onclick="setModalTxType('expense')" id="modal-type-expense" class="flex-1 py-1.5 rounded-lg bg-[#29354d] text-rose-400 shadow-sm transition-all text-center">
+            Despesa
+          </button>
+          <button onclick="setModalTxType('income')" id="modal-type-income" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-all text-center">
+            Receita
+          </button>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">DESCRIÇÃO</label>
+          <input type="text" id="modal-tx-name" placeholder="Ex: Mercado, Financiamento, Salário..." class="w-full bg-[#182033] border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">VALOR TOTAL (R$)</label>
+            <input type="text" id="modal-tx-value" oninput="formatCurrencyInput(this); updateInstallmentPreview();" placeholder="0,00" class="w-full font-bold text-xs bg-[#182033] border border-slate-700/60 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-slate-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">DATA (1ª PARCELA)</label>
+            <input type="date" id="modal-tx-date" onchange="updateInstallmentPreview()" class="w-full bg-[#182033] border border-slate-700/60 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-slate-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">CONTA / CARTÃO</label>
+            <select id="modal-tx-account" class="w-full bg-[#182033] border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-500"></select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">CATEGORIA</label>
+            <select id="modal-tx-category" class="w-full bg-[#182033] border border-slate-700/60 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-slate-500"></select>
+          </div>
+        </div>
+
+        <div class="pt-1">
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">REPETIÇÃO</label>
+          <div class="grid grid-cols-3 gap-2 text-xs font-semibold">
+            <button type="button" onclick="setRecurMode('none')" id="recur-btn-none" class="py-1.5 rounded-xl border border-slate-700/60 text-slate-400 bg-[#182033]">
+              Única
+            </button>
+            <button type="button" onclick="setRecurMode('fixed')" id="recur-btn-fixed" class="py-1.5 rounded-xl border border-slate-700/60 text-slate-400 bg-[#182033]">
+              Fixa Mensal
+            </button>
+            <button type="button" onclick="setRecurMode('installments')" id="recur-btn-inst" class="py-1.5 rounded-xl border-2 border-emerald-400 bg-emerald-950/20 text-emerald-400 font-bold">
+              Parcelada
+            </button>
+          </div>
+
+          <div id="installment-options" class="mt-3 p-3 bg-[#131b2e] rounded-xl space-y-2.5 border border-slate-700/70">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-white">Configurar Parcelamento</span>
+              <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">MÁX: 360X</span>
+            </div>
+
+            <div>
+              <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">MODALIDADE</span>
+              <div class="grid grid-cols-3 p-0.5 bg-[#0e1424] rounded-xl border border-slate-700/60 text-[11px] font-semibold">
+                <button type="button" onclick="setInstallmentMode('cartao')" id="mod-tab-cartao" class="py-1 rounded-lg bg-[#27354f] text-white text-center shadow-xs">
+                  Cartão
+                </button>
+                <button type="button" onclick="setInstallmentMode('emprestimos')" id="mod-tab-emprestimos" class="py-1 rounded-lg text-slate-400 hover:text-white text-center transition-colors">
+                  Empréstimos
+                </button>
+                <button type="button" onclick="setInstallmentMode('imobiliario')" id="mod-tab-imobiliario" class="py-1 rounded-lg text-slate-400 hover:text-white text-center transition-colors">
+                  Imobiliário
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nº DE PARCELAS</label>
+                <div class="relative">
+                  <input type="number" id="modal-tx-manual-count" value="2" min="2" max="360" oninput="handleManualInstallmentInput(this.value)" class="w-full bg-[#182033] border border-slate-700/70 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-slate-500">
+                  <span class="absolute right-3 top-1.5 text-xs font-semibold text-slate-400">x</span>
+                </div>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ATALHOS COMUNS</label>
+                <select id="modal-tx-shortcut-select" onchange="handleShortcutSelect(this.value)" class="w-full bg-[#182033] border border-slate-700/70 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-slate-500 cursor-pointer">
+                </select>
+              </div>
+            </div>
+
+            <div class="p-2.5 bg-[#0a1824] border border-emerald-950/80 rounded-xl">
+              <p id="installment-calc-preview" class="text-xs font-bold text-emerald-400">
+                2 parcelas de R$ 0,00
+              </p>
+              <p id="installment-date-preview" class="text-[10px] text-slate-400 mt-0.5">
+                Término previsto: outubro de 2026
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-3 flex items-center justify-end gap-4">
+          <button type="button" onclick="closeModal('modal-tx')" class="text-xs font-bold text-slate-300 hover:text-white transition-colors">
+            Cancelar
+          </button>
+          <button type="button" onclick="submitNewTransaction()" class="px-5 py-2 rounded-xl bg-[#00a86b] hover:bg-[#00965f] text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all">
+            Salvar Lançamento
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TRANSFERÊNCIA -->
+  <div id="modal-transfer" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg> Transferência entre Contas
+        </h3>
+        <button onclick="closeModal('modal-transfer')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Conta de Origem</label>
+          <select id="transfer-from-account" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Conta de Destino</label>
+          <select id="transfer-to-account" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Valor (R$)</label>
+            <input type="text" id="transfer-val" oninput="formatCurrencyInput(this)" placeholder="0,00" class="w-full font-bold text-base bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data</label>
+            <input type="date" id="transfer-date" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none">
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2">
+        <button onclick="closeModal('modal-transfer')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400">Cancelar</button>
+        <button onclick="submitTransfer()" class="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold">Transferir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ORÇAMENTO -->
+  <div id="modal-budget" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+      <h3 class="text-sm font-bold text-slate-900 dark:text-white" id="budget-modal-title">Novo Orçamento</h3>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Categoria Vinculada</label>
+        <select id="budget-category-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Limite Mensal (R$)</label>
+        <input type="text" id="budget-limit" oninput="formatCurrencyInput(this)" placeholder="0,00" class="w-full font-bold text-base bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-slate-900 dark:text-white">
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modal-budget')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500">Cancelar</button>
+        <button onclick="saveBudgetFromModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: META -->
+  <div id="modal-goal" class="fixed inset-0 bg-slate-950/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+      <h3 class="text-sm font-bold text-slate-900 dark:text-white">Nova Meta Financeira</h3>
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Nome do Objetivo</label>
+        <input type="text" id="goal-name" placeholder="Ex: Viagem, Carro..." class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white">
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Emoji</label>
+          <input type="text" id="goal-icon" value="🎯" class="w-full text-center text-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Prazo</label>
+          <input type="month" id="goal-date" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Já Guardado (R$)</label>
+          <input type="text" id="goal-current" oninput="formatCurrencyInput(this)" placeholder="0,00" class="w-full font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Valor Total (R$)</label>
+          <input type="text" id="goal-total" oninput="formatCurrencyInput(this)" placeholder="0,00" class="w-full font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs">
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button onclick="closeModal('modal-goal')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500">Cancelar</button>
+        <button onclick="saveGoalFromModal()" class="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold">Salvar Meta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-3 px-4 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-800 text-xs font-medium">
+    <div id="toast-icon" class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">✓</div>
+    <span id="toast-msg">Operação realizada com sucesso!</span>
+  </div>
+
+  <!-- Módulos de Execução do Sistema (Ordem de Dependência Respeitada) -->
+  <script src="js/utils.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
