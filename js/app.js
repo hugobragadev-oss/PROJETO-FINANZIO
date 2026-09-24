@@ -1,5 +1,10 @@
 function switchScreen(screenId) {
   AppState.currentScreen = screenId;
+  if (screenId === 'transactions') {
+    const today = new Date();
+    AppState.selectedYear = today.getFullYear();
+    AppState.selectedMonth = today.getMonth();
+  }
   document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
   const activeSec = document.getElementById(`screen-${screenId}`);
   if (activeSec) activeSec.classList.remove('hidden');
@@ -94,6 +99,24 @@ function toggleMonthPickerDropdown() {
   }
 }
 
+function toggleTransactionFilters() {
+  const filterBar = document.getElementById('tx-filter-bar-container');
+  const headerFilterButton = document.getElementById('header-filter-btn');
+  const filteredReportButton = document.getElementById('tx-filtered-report-btn');
+  const periodReportButton = document.getElementById('tx-period-report-btn');
+  if (!filterBar || !filteredReportButton || !periodReportButton) return;
+
+  const isOpening = filterBar.classList.contains('hidden');
+  filterBar.classList.toggle('hidden', !isOpening);
+  if (headerFilterButton) {
+    headerFilterButton.setAttribute('aria-expanded', String(isOpening));
+  }
+
+  periodReportButton.classList.toggle('hidden', isOpening);
+  filteredReportButton.style.order = isOpening ? '2' : '1';
+  periodReportButton.style.order = '2';
+}
+
 function selectQuickMonth(mIndex) {
   AppState.selectedMonth = mIndex;
   document.getElementById('month-picker-dropdown').classList.add('hidden');
@@ -170,6 +193,7 @@ document.addEventListener('click', (e) => {
 // Ponto de Entrada da Aplicação
 window.addEventListener('DOMContentLoaded', () => {
   initStorage();
+  updateValuesVisibilityButton();
   populateSelectOptions();
   switchScreen('transactions');
   updateDashboardMetrics();

@@ -1,6 +1,38 @@
 // Funções Utilitárias: Formatação e Sanitização
+let financialValuesVisible = localStorage.getItem('finanzio_values_visible') !== 'false';
+
 function formatCurrency(val) {
+  if (!financialValuesVisible) return 'R$ ****';
   return (val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function updateValuesVisibilityButton() {
+  const button = document.getElementById('header-values-toggle');
+  const openIcon = document.getElementById('header-values-eye-open');
+  const closedIcon = document.getElementById('header-values-eye-closed');
+  if (!button || !openIcon || !closedIcon) return;
+
+  const action = financialValuesVisible ? 'Ocultar' : 'Mostrar';
+  button.title = `${action} valores`;
+  button.setAttribute('aria-label', `${action} valores`);
+  button.setAttribute('aria-pressed', String(!financialValuesVisible));
+  openIcon.classList.toggle('hidden', !financialValuesVisible);
+  closedIcon.classList.toggle('hidden', financialValuesVisible);
+}
+
+function toggleValuesVisibility() {
+  financialValuesVisible = !financialValuesVisible;
+  localStorage.setItem('finanzio_values_visible', String(financialValuesVisible));
+  updateValuesVisibilityButton();
+
+  updateDashboardMetrics();
+  renderTransactionsList();
+  renderBudgetsScreen();
+  renderGoalsScreen();
+  renderAccountsScreen();
+  renderCashflowChart();
+  renderGastosDonut();
+  if (AppState.currentScreen === 'reports') renderReportsChart();
 }
 
 function parseCurrencyString(str) {

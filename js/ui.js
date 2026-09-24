@@ -19,6 +19,16 @@ const TABELA_MODALIDADES = {
     { count: 240, label: '240x (20 anos)' },
     { count: 300, label: '300x (25 anos)' },
     { count: 360, label: '360x (30 anos - Imóvel)' }
+  ],
+  financiamento: [
+    { count: 12, label: '12x (1 ano)' },
+    { count: 24, label: '24x (2 anos)' },
+    { count: 36, label: '36x (3 anos)' },
+    { count: 48, label: '48x (4 anos)' },
+    { count: 60, label: '60x (5 anos)' },
+    { count: 120, label: '120x (10 anos)' },
+    { count: 240, label: '240x (20 anos)' },
+    { count: 360, label: '360x (30 anos)' }
   ]
 };
 
@@ -266,6 +276,16 @@ function renderTransactionsList() {
   }).join('');
 }
 
+function clearTransactionFilters() {
+  ['tx-filter-type', 'tx-filter-status', 'tx-filter-account', 'tx-filter-category'].forEach(id => {
+    const filter = document.getElementById(id);
+    if (filter) filter.value = 'all';
+  });
+
+  renderTransactionsList();
+  showToast('Filtros limpos com sucesso!');
+}
+
 function quickTogglePaid(txId) {
   const tx = AppState.transactions.find(t => t.id === txId);
   if (!tx) return;
@@ -427,7 +447,7 @@ function setRecurMode(mode) {
 
 function setInstallmentMode(mode) {
   modalidadeSelecionada = mode;
-  const keys = ['cartao', 'emprestimos', 'imobiliario'];
+  const keys = ['cartao', 'emprestimos', 'imobiliario', 'financiamento'];
   
   keys.forEach(k => {
     const btn = document.getElementById(`mod-tab-${k}`);
@@ -981,7 +1001,12 @@ function printFilteredReport() {
     return true;
   });
 
-  renderPrintableWindow(items, 'Relatório de Lançamentos Filtrados');
+  if (items.length === 0) {
+    showToast('Nenhum dado para emitir relatório!');
+    return;
+  }
+
+  exportQuickStatement(items, 'Itens filtrados');
 }
 
 function printPeriodReport() {
@@ -1063,7 +1088,7 @@ function renderPrintableWindow(items, title) {
   printWin.document.close();
 }
 
-function exportQuickStatement() {
+function exportQuickStatement(itemsOverride = null, reportBadge = 'Todos os lançamentos') {
   const monthsNames = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
@@ -1073,7 +1098,7 @@ function exportQuickStatement() {
   const currentPeriodPrefix = `${yr}-${String(AppState.selectedMonth + 1).padStart(2, '0')}`;
 
   // Filtra as transações pertencentes ao mês ativo no cabeçalho
-  const data = AppState.transactions.filter(t => t.date && t.date.startsWith(currentPeriodPrefix));
+  const data = itemsOverride || AppState.transactions.filter(t => t.date && t.date.startsWith(currentPeriodPrefix));
 
   const fmt = v => (v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
@@ -1195,7 +1220,7 @@ function exportQuickStatement() {
         </div>
         <div class="header-right">
           <div class="h-title">Extrato &mdash; ${monthName} ${yr}</div>
-          <div class="h-badge">Todos os lançamentos</div><br>
+          <div class="h-badge">${reportBadge}</div><br>
           <span class="h-date">Gerado em ${today}</span>
         </div>
       </div>
@@ -1247,7 +1272,7 @@ function exportQuickStatement() {
 
       <div class="footer">
         <span>Finanzio &mdash; Controle Financeiro</span>
-        <span>${data.length} lançamento${data.length !== 1 ? 's' : ''} &middot; Todos os lançamentos &middot; ${monthName} ${yr}</span>
+        <span>${data.length} lançamento${data.length !== 1 ? 's' : ''} &middot; ${reportBadge} &middot; ${monthName} ${yr}</span>
       </div>
 
       <div class="no-print">
