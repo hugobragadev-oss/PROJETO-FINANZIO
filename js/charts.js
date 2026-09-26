@@ -2,6 +2,8 @@ function renderCashflowChart() {
   const canvas = document.getElementById('flowCanvas');
   if (!canvas) return;
   if (AppState.charts.flow) AppState.charts.flow.destroy();
+  const yearLabel = document.getElementById('dash-cashflow-year');
+  if (yearLabel) yearLabel.textContent = AppState.selectedYear;
 
   const isDark = AppState.theme === 'dark';
   const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -9,9 +11,11 @@ function renderCashflowChart() {
   const expData = Array(12).fill(0);
 
   AppState.transactions.forEach(t => {
-    const parts = t.date.split('-');
-    if (parts.length >= 2 && parseInt(parts[0]) === AppState.selectedYear) {
-      const m = parseInt(parts[1]) - 1;
+    const parts = t.date?.split('-') || [];
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    if (year === AppState.selectedYear && month >= 1 && month <= 12) {
+      const m = month - 1;
       if (t.type === 'income') incData[m] += t.amount;
       if (t.type === 'expense') expData[m] += t.amount;
     }
@@ -53,21 +57,19 @@ function renderGastosDonut() {
   if (AppState.charts.donut) AppState.charts.donut.destroy();
 
   const currentMonthStr = `${AppState.selectedYear}-${String(AppState.selectedMonth + 1).padStart(2, '0')}`;
-  const expenses = AppState.transactions.filter(t => t.type === 'expense' && t.date.startsWith(currentMonthStr));
+  const expenses = AppState.transactions.filter(t => t.type === 'expense' && t.date?.startsWith(currentMonthStr));
   const catTotals = {};
 
   expenses.forEach(t => { catTotals[t.category] = (catTotals[t.category] || 0) + t.amount; });
 
-  const labels = [];
-  const data = [];
-  const colors = [];
-
-  Object.entries(catTotals).forEach(([catId, total]) => {
+  const categories = Object.entries(catTotals).map(([catId, total]) => {
     const c = AppState.categories.find(item => item.id === catId) || { name: 'Outros', color: '#94a3b8' };
-    labels.push(c.name);
-    data.push(total);
-    colors.push(c.color);
-  });
+    return { name: c.name, total, color: c.color };
+  }).sort((a, b) => b.total - a.total);
+
+  const labels = categories.map(category => category.name);
+  const data = categories.map(category => category.total);
+  const colors = categories.map(category => category.color);
 
   if (data.length === 0) {
     labels.push('Sem gastos');

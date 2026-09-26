@@ -10,12 +10,13 @@ function switchScreen(screenId) {
   if (activeSec) activeSec.classList.remove('hidden');
 
   const isTx = (screenId === 'transactions');
+  const showNewAction = isTx || screenId === 'dashboard';
   const periodCtrl = document.getElementById('header-period-controls');
   const actionBtn = document.getElementById('header-action-button-container');
   const filterBtn = document.getElementById('header-filter-btn');
 
   if (periodCtrl) periodCtrl.style.display = isTx ? 'flex' : 'none';
-  if (actionBtn) actionBtn.style.display = isTx ? 'block' : 'none';
+  if (actionBtn) actionBtn.style.display = showNewAction ? 'block' : 'none';
   if (filterBtn) filterBtn.style.display = isTx ? 'block' : 'none';
 
   document.querySelectorAll('.nav-item').forEach(btn => {
@@ -46,8 +47,6 @@ function switchScreen(screenId) {
 
   if (screenId === 'dashboard') {
     updateDashboardMetrics();
-    renderCashflowChart();
-    renderGastosDonut();
   } else if (screenId === 'transactions') {
     renderTransactionsList();
   } else if (screenId === 'budgets') {
@@ -162,8 +161,6 @@ function importJSONBackup(event) {
         persistState();
         populateSelectOptions();
         updateDashboardMetrics();
-        renderCashflowChart();
-        renderGastosDonut();
         showToast('Dados restaurados com sucesso!');
       } else {
         showToast('Arquivo de backup inválido!');

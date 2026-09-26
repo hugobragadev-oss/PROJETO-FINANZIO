@@ -26,6 +26,56 @@ const DEFAULT_BUDGETS = [
   { id: 'b_5', categoryId: 'health', limit: 500 }
 ];
 
+function normalizeBudget(budget, index = 0) {
+  const categoryValues = [
+    budget.categoryId,
+    budget.category_id,
+    budget.category,
+    budget.cat,
+    budget.categoryName,
+    budget.category_name,
+    budget.name
+  ].map(value => value && typeof value === 'object' ? value.id ?? value.name : value)
+    .filter(value => value !== undefined && value !== null && value !== '');
+  const normalizedValues = categoryValues.map(value =>
+    String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  );
+  const category = AppState.categories.find(item => {
+    const categoryId = String(item.id).toLowerCase();
+    const categoryName = item.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    return normalizedValues.includes(categoryId) || normalizedValues.includes(categoryName);
+  });
+
+  return {
+    ...budget,
+    id: String(budget.id ?? budget._id ?? `b_legacy_${index}`),
+    categoryId: category ? category.id : String(categoryValues[0] ?? ''),
+    limit: Number(budget.limit ?? budget.amount) || 0
+  };
+}
+
+function normalizeAccount(account, index = 0) {
+  const accountType = String(account.type || '').toLowerCase();
+  const type = ['card', 'credit', 'credit-card', 'credit_card', 'cartao', 'cartão'].includes(accountType)
+    || account.limit !== undefined
+    ? 'card'
+    : 'bank';
+  const due = Number(account.due) || 15;
+
+  return {
+    ...account,
+    id: String(account.id ?? account._id ?? `account_legacy_${index}`),
+    type,
+    initialBalance: Number(account.initialBalance ?? account.balance) || 0,
+    initialBill: Number(account.initialBill ?? account.bill) || 0,
+    ...(type === 'card' ? {
+      limit: Number(account.limit) || 0,
+      due,
+      closingDay: Number(account.closingDay ?? account.closing ?? account.closeDay) || due
+    } : {})
+  };
+}
+
 const DEFAULT_GOALS = [
   { id: 'g_1', name: 'Viagem 2026', icon: '✈️', current: 14200, total: 25000, date: '2026-11', color: '#3b82f6' },
   { id: 'g_2', name: 'Reserva de Emergência', icon: '🛡️', current: 28000, total: 50000, date: '2027-06', color: '#10b981' },
@@ -62,6 +112,9 @@ let AppState = {
   charts: { flow: null, donut: null, reports: null }
 };
 
+let transactionSyncRevision = 0;
+let pendingTransactionSyncWrites = 0;
+
 function fbReady() { return window._fbReady && window._fbDB; }
 
 async function waitForFirebase(timeout = 6000) {
@@ -76,7 +129,10 @@ async function waitForFirebase(timeout = 6000) {
 }
 
 async function fbSave(colName, docId, data) {
+  const tracksTransactions = colName === 'transactions';
+  if (tracksTransactions) transactionSyncRevision++;
   if (!fbReady()) return;
+  if (tracksTransactions) pendingTransactionSyncWrites++;
   try {
     const clean = {};
     Object.entries(data).forEach(([k, v]) => {
@@ -85,15 +141,22 @@ async function fbSave(colName, docId, data) {
     await window._fbDB.collection(colName).doc(String(docId)).set(clean, { merge: true });
   } catch (e) {
     console.warn(`Erro ao salvar no Firebase [${colName}]:`, e);
+  } finally {
+    if (tracksTransactions) pendingTransactionSyncWrites--;
   }
 }
 
 async function fbDelete(colName, docId) {
+  const tracksTransactions = colName === 'transactions';
+  if (tracksTransactions) transactionSyncRevision++;
   if (!fbReady()) return;
+  if (tracksTransactions) pendingTransactionSyncWrites++;
   try {
     await window._fbDB.collection(colName).doc(String(docId)).delete();
   } catch (e) {
     console.warn(`Erro ao excluir do Firebase [${colName}]:`, e);
+  } finally {
+    if (tracksTransactions) pendingTransactionSyncWrites--;
   }
 }
 
@@ -109,6 +172,8 @@ async function fbGetAll(colName) {
 }
 
 async function syncFromFirebase() {
+  const syncRevision = transactionSyncRevision;
+  const pendingWritesAtSyncStart = pendingTransactionSyncWrites;
   const ready = await waitForFirebase();
   if (!ready) return;
 
@@ -122,7 +187,10 @@ async function syncFromFirebase() {
 
     let updated = false;
 
-    if (fbTx && fbTx.length > 0) {
+    const transactionsUnchangedDuringSync = transactionSyncRevision === syncRevision
+      && pendingWritesAtSyncStart === 0
+      && pendingTransactionSyncWrites === 0;
+    if (fbTx && fbTx.length > 0 && transactionsUnchangedDuringSync) {
       AppState.transactions = fbTx.map(t => {
         let d = t.date;
         if (d && d.includes('/')) {
@@ -136,10 +204,13 @@ async function syncFromFirebase() {
           amount: Math.abs(t.amount || 0),
           date: d || new Date().toISOString().split('T')[0],
           bank: t.bank || 'Bradesco',
+          accountId: t.accountId ? String(t.accountId) : '',
           category: t.cat || t.category || 'housing',
           paid: !!t.paid,
           obs: t.obs || '',
-          installments: t.sub || (t.instTotal ? `${t.instNum || 1}/${t.instTotal}` : '')
+          createdAt: t.createdAt || '',
+          installments: t.sub || (t.instTotal ? `${t.instNum || 1}/${t.instTotal}` : ''),
+          installmentGroupId: t.installmentGroupId || ''
         };
       });
       updated = true;
@@ -150,21 +221,13 @@ async function syncFromFirebase() {
       updated = true;
     }
 
-    if (fbBudgets && fbBudgets.length > 0) {
-      AppState.budgets = fbBudgets.map(b => ({
-        id: b.id,
-        categoryId: b.categoryId || (b.name ? b.name.toLowerCase() : 'food'),
-        limit: b.limit || 1000
-      }));
+    if (fbBudgets) {
+      AppState.budgets = fbBudgets.map((budget, index) => normalizeBudget(budget, index));
       updated = true;
     }
 
-    if (fbAccounts && fbAccounts.length > 0) {
-      AppState.accounts = fbAccounts.map(a => ({
-        ...a,
-        initialBalance: a.initialBalance !== undefined ? a.initialBalance : (a.balance || 0),
-        initialBill: a.initialBill !== undefined ? a.initialBill : (a.bill || 0)
-      }));
+    if (fbAccounts) {
+      AppState.accounts = fbAccounts.map((account, index) => normalizeAccount(account, index));
       updated = true;
     }
 
@@ -173,8 +236,6 @@ async function syncFromFirebase() {
       populateSelectOptions();
       updateDashboardMetrics();
       renderTransactionsList();
-      renderCashflowChart();
-      renderGastosDonut();
       showToast('☁️ Dados sincronizados com o banco!');
     }
   } catch (err) {
@@ -190,17 +251,14 @@ function initStorage() {
   AppState.categories = JSON.parse(localStorage.getItem('finanzio_categories')) || DEFAULT_CATEGORIES;
   
   const storedAccounts = JSON.parse(localStorage.getItem('finanzio_accounts'));
-  if (storedAccounts && storedAccounts.length > 0) {
-    AppState.accounts = storedAccounts.map(a => ({
-      ...a,
-      initialBalance: a.initialBalance !== undefined ? a.initialBalance : (a.balance || 0),
-      initialBill: a.initialBill !== undefined ? a.initialBill : (a.bill || 0)
-    }));
+  if (storedAccounts) {
+    AppState.accounts = storedAccounts.map((account, index) => normalizeAccount(account, index));
   } else {
     AppState.accounts = DEFAULT_ACCOUNTS;
   }
 
-  AppState.budgets = JSON.parse(localStorage.getItem('finanzio_budgets')) || DEFAULT_BUDGETS;
+  const storedBudgets = JSON.parse(localStorage.getItem('finanzio_budgets'));
+  AppState.budgets = (storedBudgets || DEFAULT_BUDGETS).map((budget, index) => normalizeBudget(budget, index));
   AppState.goals = JSON.parse(localStorage.getItem('finanzio_goals')) || DEFAULT_GOALS;
   AppState.transactions = JSON.parse(localStorage.getItem('finanzio_transactions')) || DEFAULT_TRANSACTIONS;
 }
@@ -222,7 +280,7 @@ function getDynamicAccountBalance(acc) {
     let bal = acc.initialBalance || 0;
     AppState.transactions.forEach(t => {
       if (!t.paid) return;
-      if (t.bank === acc.name) {
+      if (transactionBelongsToAccount(t, acc)) {
         if (t.type === 'income') bal += t.amount;
         else if (t.type === 'expense') bal -= t.amount;
         else if (t.type === 'transfer') bal -= t.amount;
@@ -234,13 +292,49 @@ function getDynamicAccountBalance(acc) {
     return bal;
   } else {
     let bill = acc.initialBill || 0;
+    const currentInvoicePeriod = getCardCurrentInvoicePeriod(acc);
     AppState.transactions.forEach(t => {
-      if (t.bank === acc.name && t.type === 'expense') {
+      if (transactionBelongsToAccount(t, acc) && t.type === 'expense'
+        && getCardInvoicePeriod(acc, t.date) === currentInvoicePeriod) {
         bill += t.amount;
       }
     });
     return bill;
   }
+}
+
+function getCardOutstandingBalance(account, today = new Date()) {
+  const currentInvoicePeriod = getCardCurrentInvoicePeriod(account, today);
+  return (Number(account.initialBill) || 0) + AppState.transactions.reduce((total, transaction) => {
+    const invoicePeriod = getCardInvoicePeriod(account, transaction.date);
+    if (transactionBelongsToAccount(transaction, account)
+      && transaction.type === 'expense'
+      && invoicePeriod >= currentInvoicePeriod) {
+      return total + (Number(transaction.amount) || 0);
+    }
+    return total;
+  }, 0);
+}
+
+function transactionBelongsToAccount(transaction, account) {
+  return (transaction.accountId && String(transaction.accountId) === String(account.id))
+    || transaction.bank === account.name;
+}
+
+function getCardInvoicePeriod(account, date) {
+  if (!date) return '';
+  const [yearValue, monthValue, dayValue] = date.split('-').map(Number);
+  if (!yearValue || !monthValue || !dayValue) return '';
+
+  const closingDay = Number(account.closingDay ?? account.due) || 15;
+  const invoiceDate = new Date(yearValue, monthValue - 1 + (dayValue > closingDay ? 1 : 0), 1);
+  return `${invoiceDate.getFullYear()}-${String(invoiceDate.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getCardCurrentInvoicePeriod(account, today = new Date()) {
+  const closingDay = Number(account.closingDay ?? account.due) || 15;
+  const invoiceDate = new Date(today.getFullYear(), today.getMonth() + (today.getDate() > closingDay ? 1 : 0), 1);
+  return `${invoiceDate.getFullYear()}-${String(invoiceDate.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function getCategoryCurrentSpending(categoryId, year, month) {

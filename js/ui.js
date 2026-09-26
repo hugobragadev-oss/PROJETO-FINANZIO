@@ -36,6 +36,8 @@ let modalidadeSelecionada = 'cartao';
 let drawerPaidState = false;
 let accModalCurrentType = 'bank';
 let currentCatTab = 'expense';
+let editingBudgetId = null;
+let editingAccountId = null;
 
 function applyTheme(theme) {
   const html = document.documentElement;
@@ -47,8 +49,13 @@ function applyTheme(theme) {
     html.classList.remove('dark');
     if (dot) dot.style.transform = 'translateX(0px)';
   }
+
   localStorage.setItem('finanzio_theme', theme);
   AppState.theme = theme;
+}
+
+function formatDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function toggleTheme() {
@@ -121,9 +128,13 @@ function updateDashboardMetrics() {
   document.getElementById('dash-saldo-prev').textContent = `Previsto: ${formatCurrency(netPlanned)}`;
 
   const recentContainer = document.getElementById('dash-recent-tx');
-  const sortedTx = [...AppState.transactions].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+  const sortedTx = monthTx.slice().sort((a, b) => {
+    const createdAtA = Date.parse(a.createdAt || `${a.date}T00:00:00`) || 0;
+    const createdAtB = Date.parse(b.createdAt || `${b.date}T00:00:00`) || 0;
+    return createdAtB - createdAtA;
+  }).slice(0, 5);
   
-  recentContainer.innerHTML = sortedTx.map(tx => {
+  recentContainer.innerHTML = sortedTx.length ? sortedTx.map(tx => {
     const cat = AppState.categories.find(c => c.id === tx.category) || { icon: '💳', name: 'Geral' };
     const isIncome = tx.type === 'income';
     return `
@@ -147,9 +158,53 @@ function updateDashboardMetrics() {
         </div>
       </div>
     `;
-  }).join('');
+  }).join('') : '<p class="py-6 text-center text-xs text-slate-400">Nenhum lançamento neste período.</p>';
 
   document.getElementById('tx-badge-count').textContent = AppState.transactions.length;
+  if (AppState.currentScreen === 'accounts') renderAccountsScreen();
+  renderDashboardBudgets();
+  if (AppState.currentScreen === 'dashboard') {
+    renderCashflowChart();
+    renderGastosDonut();
+  }
+}
+
+function renderDashboardBudgets() {
+  const list = document.getElementById('dash-budgets-list');
+  if (!list) return;
+
+  const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const title = document.getElementById('dash-budgets-title');
+  if (title) title.textContent = `Orçamentos de ${monthsNames[AppState.selectedMonth]}`;
+
+  const budgets = AppState.budgets.map(budget => {
+    const category = AppState.categories.find(c => c.id === budget.categoryId) || { name: 'Geral', icon: '💳' };
+    const spent = getCategoryCurrentSpending(budget.categoryId, AppState.selectedYear, AppState.selectedMonth);
+    const limit = Number(budget.limit) || 0;
+    const percentage = limit > 0 ? (spent / limit) * 100 : 0;
+    return { category, spent, limit, percentage };
+  }).sort((a, b) => b.spent - a.spent).slice(0, 5);
+
+  if (budgets.length === 0) {
+    list.innerHTML = '<p class="py-4 text-center text-[11px] text-slate-400">Nenhum orçamento cadastrado.</p>';
+    return;
+  }
+
+  list.innerHTML = budgets.map(({ category, spent, limit, percentage }) => {
+    const barColor = percentage >= 100 ? 'bg-rose-500' : percentage >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
+    const barWidth = Math.min(100, Math.max(0, percentage));
+    return `
+      <div>
+        <div class="flex items-center justify-between gap-2 text-[10px] leading-4">
+          <span class="truncate text-slate-700 dark:text-slate-300">${category.icon} ${category.name}</span>
+          <span class="shrink-0 text-slate-500">${formatCurrency(spent)}/${formatCurrency(limit)}</span>
+        </div>
+        <div class="h-1.5 w-full mt-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div class="h-full rounded-full ${barColor}" style="width: ${barWidth}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderTransactionsList() {
@@ -264,7 +319,7 @@ function renderTransactionsList() {
                     </span>
                   </div>
                   <button onclick="event.stopPropagation(); quickTogglePaid('${tx.id}')" class="p-1.5 rounded-lg text-xs ${tx.paid ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20' : 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'} transition-colors" title="${tx.paid ? 'Efetivado' : 'Pendente'}">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+                    <svg class="w-4 h-4 ${tx.paid ? '' : 'rotate-180'}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
                   </button>
                 </div>
               </div>
@@ -318,7 +373,12 @@ function openDrawer(txId) {
   }
 
   populateSelectOptions();
-  document.getElementById('drawer-account').value = tx.bank;
+  const transactionAccount = AppState.accounts.find(account =>
+    (tx.accountId && String(account.id) === String(tx.accountId)) || account.name === tx.bank
+  );
+  document.getElementById('drawer-account').value = transactionAccount
+    ? String(transactionAccount.id)
+    : '';
   document.getElementById('drawer-category').value = tx.category;
 
   setDrawerPaidStatus(tx.paid);
@@ -355,7 +415,10 @@ function saveDrawerTransaction() {
   tx.name = document.getElementById('drawer-title').value.trim() || tx.name;
   tx.amount = parseCurrencyString(document.getElementById('drawer-amount').value);
   tx.date = document.getElementById('drawer-date').value;
-  tx.bank = document.getElementById('drawer-account').value;
+  const selectedAccountId = document.getElementById('drawer-account').value;
+  const selectedAccount = AppState.accounts.find(account => String(account.id) === String(selectedAccountId));
+  tx.bank = selectedAccount ? selectedAccount.name : selectedAccountId;
+  tx.accountId = selectedAccount ? String(selectedAccount.id) : '';
   tx.category = document.getElementById('drawer-category').value;
   tx.paid = drawerPaidState;
   tx.obs = document.getElementById('drawer-obs').value;
@@ -364,35 +427,109 @@ function saveDrawerTransaction() {
   fbSave('transactions', tx.id, tx);
   closeDrawer();
   updateDashboardMetrics();
+  if (AppState.currentScreen === 'accounts') renderAccountsScreen();
   if (AppState.currentScreen === 'transactions') renderTransactionsList();
   showToast('Transação atualizada com sucesso!');
 }
 
 function deleteDrawerTransaction() {
   if (!AppState.activeDrawerTxId) return;
+  const tx = AppState.transactions.find(t => t.id === AppState.activeDrawerTxId);
+  if (!tx) return;
+  if (getInstallmentDetails(tx)) {
+    document.getElementById('modal-delete-installment').classList.remove('hidden');
+    return;
+  }
+
   const idToDelete = AppState.activeDrawerTxId;
   AppState.transactions = AppState.transactions.filter(t => t.id !== idToDelete);
   persistState();
   fbDelete('transactions', idToDelete);
   closeDrawer();
   updateDashboardMetrics();
+  if (AppState.currentScreen === 'accounts') renderAccountsScreen();
   if (AppState.currentScreen === 'transactions') renderTransactionsList();
   showToast('Lançamento removido com sucesso!');
+}
+
+function getInstallmentDetails(tx) {
+  const installmentText = tx.installments || tx.name.match(/\((\d+)\/(\d+)\)$/)?.slice(1).join('/');
+  const match = installmentText && installmentText.match(/^(\d+)\/(\d+)$/);
+  if (!match || Number(match[2]) < 2) return null;
+
+  const nameMatch = tx.name.match(/^(.*?)\s+\(\d+\/\d+\)$/);
+  return {
+    number: Number(match[1]),
+    total: Number(match[2]),
+    name: nameMatch ? nameMatch[1] : tx.name
+  };
+}
+
+function getInstallmentSeries(tx) {
+  const installment = getInstallmentDetails(tx);
+  if (!installment) return [tx];
+  if (tx.installmentGroupId) {
+    return AppState.transactions.filter(t => t.installmentGroupId === tx.installmentGroupId);
+  }
+
+  const selectedMonth = new Date(`${tx.date}T00:00:00`).getFullYear() * 12
+    + new Date(`${tx.date}T00:00:00`).getMonth();
+  return AppState.transactions.filter(candidate => {
+    const otherInstallment = getInstallmentDetails(candidate);
+    if (!otherInstallment || candidate.installmentGroupId) return false;
+    if (otherInstallment.name !== installment.name
+      || otherInstallment.total !== installment.total
+      || candidate.type !== tx.type
+      || candidate.bank !== tx.bank
+      || candidate.category !== tx.category
+      || candidate.amount !== tx.amount) return false;
+
+    const candidateDate = new Date(`${candidate.date}T00:00:00`);
+    if (Number.isNaN(candidateDate.getTime())) return false;
+    const candidateMonth = candidateDate.getFullYear() * 12 + candidateDate.getMonth();
+    return otherInstallment.number - installment.number === candidateMonth - selectedMonth;
+  });
+}
+
+function deleteInstallmentTransactions(scope) {
+  const tx = AppState.transactions.find(t => t.id === AppState.activeDrawerTxId);
+  if (!tx) return;
+
+  const series = getInstallmentSeries(tx);
+  const idsToDelete = series
+    .filter(item => scope !== 'single' && (scope !== 'future' || item.date >= tx.date))
+    .map(item => item.id);
+  if (scope === 'single') idsToDelete.push(tx.id);
+
+  AppState.transactions = AppState.transactions.filter(item => !idsToDelete.includes(item.id));
+  persistState();
+  idsToDelete.forEach(id => fbDelete('transactions', id));
+  closeModal('modal-delete-installment');
+  closeDrawer();
+  updateDashboardMetrics();
+  if (AppState.currentScreen === 'transactions') renderTransactionsList();
+
+  const successMessage = scope === 'single'
+    ? 'Parcela removida com sucesso!'
+    : scope === 'future'
+      ? 'Esta e as parcelas futuras foram removidas!'
+      : 'Parcelamento removido com sucesso!';
+  showToast(successMessage);
 }
 
 function openModal(modalType) {
   if (modalType === 'expense' || modalType === 'income') {
     populateSelectOptions();
     setModalTxType(modalType);
-    document.getElementById('modal-tx-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('modal-tx-date').value = formatDateInputValue(new Date());
     document.getElementById('modal-tx-name').value = '';
     document.getElementById('modal-tx-value').value = '';
-    setRecurMode('installments');
+    setRecurMode(modalType === 'expense' ? 'installments' : 'none');
     setInstallmentMode('cartao');
     document.getElementById('modal-tx').classList.remove('hidden');
   } else if (modalType === 'transfer') {
     populateSelectOptions();
-    document.getElementById('transfer-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('transfer-date').value = formatDateInputValue(new Date());
     document.getElementById('transfer-val').value = '';
     document.getElementById('modal-transfer').classList.remove('hidden');
   }
@@ -407,20 +544,25 @@ function setModalTxType(type) {
   const bExp = document.getElementById('modal-type-expense');
   const bInc = document.getElementById('modal-type-income');
   const heading = document.getElementById('modal-tx-heading');
+  const recurrenceSection = document.getElementById('expense-recurrence');
 
   if (type === 'expense') {
+    recurrenceSection.classList.remove('hidden');
     bExp.className = 'flex-1 py-1.5 rounded-lg bg-[#29354d] text-rose-400 shadow-sm transition-all text-center';
     bInc.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-all text-center';
     heading.textContent = 'Nova Despesa';
   } else {
+    recurrenceSection.classList.add('hidden');
     bInc.className = 'flex-1 py-1.5 rounded-lg bg-[#29354d] text-emerald-400 shadow-sm transition-all text-center';
     bExp.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-all text-center';
     heading.textContent = 'Nova Receita';
+    setRecurMode('none');
   }
   populateSelectOptions();
 }
 
 function setRecurMode(mode) {
+  if (AppState.modalTxType !== 'expense') mode = 'none';
   AppState.modalRecurMode = mode;
   const bNone = document.getElementById('recur-btn-none');
   const bFixed = document.getElementById('recur-btn-fixed');
@@ -513,11 +655,13 @@ function submitNewTransaction() {
   const name = document.getElementById('modal-tx-name').value.trim();
   const val = parseCurrencyString(document.getElementById('modal-tx-value').value);
   const date = document.getElementById('modal-tx-date').value;
-  const bank = document.getElementById('modal-tx-account').value;
+  const accountId = document.getElementById('modal-tx-account').value;
   const category = document.getElementById('modal-tx-category').value;
+  const selectedAccount = AppState.accounts.find(account => String(account.id) === String(accountId));
+  const bank = selectedAccount ? selectedAccount.name : '';
 
-  if (!name || val <= 0 || !date) {
-    showToast('Preencha descrição, valor e data válida!');
+  if (!name || val <= 0 || !date || !selectedAccount) {
+    showToast('Preencha descrição, valor, conta/cartão e data válida!');
     return;
   }
 
@@ -529,10 +673,13 @@ function submitNewTransaction() {
     const parcelAmt = parseFloat((val / count).toFixed(2));
     const [year, month, day] = date.split('-').map(n => parseInt(n, 10));
 
+    const installmentGroupId = 'inst_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const selectedAccountId = String(selectedAccount.id);
+    const createdAt = new Date().toISOString();
     const createdInstallments = [];
     for (let i = 1; i <= count; i++) {
       const parcelDate = new Date(year, month - 1 + (i - 1), day);
-      const dateStr = parcelDate.toISOString().split('T')[0];
+      const dateStr = formatDateInputValue(parcelDate);
       const newTx = {
         id: 'tx_' + Date.now() + '_' + i,
         name: `${name} (${i}/${count})`,
@@ -540,9 +687,12 @@ function submitNewTransaction() {
         amount: parcelAmt,
         date: dateStr,
         bank,
+        accountId: selectedAccountId,
         category,
         paid: i === 1,
         installments: `${i}/${count}`,
+        installmentGroupId,
+        createdAt,
         obs: `Parcelamento em ${count}x`
       };
       AppState.transactions.push(newTx);
@@ -558,8 +708,10 @@ function submitNewTransaction() {
       amount: val,
       date,
       bank,
+      accountId: String(selectedAccount.id),
       category,
       paid: false,
+      createdAt: new Date().toISOString(),
       obs: AppState.modalRecurMode === 'fixed' ? 'Recorrência fixa mensal' : ''
     };
     AppState.transactions.push(newTx);
@@ -569,6 +721,7 @@ function submitNewTransaction() {
 
   closeModal('modal-tx');
   updateDashboardMetrics();
+  if (AppState.currentScreen === 'accounts') renderAccountsScreen();
   if (AppState.currentScreen === 'transactions') renderTransactionsList();
   showToast('Lançamento adicionado com sucesso!');
 }
@@ -614,7 +767,7 @@ function renderBudgetsScreen() {
   container.innerHTML = AppState.budgets.map(b => {
     const cat = AppState.categories.find(c => c.id === b.categoryId) || { name: 'Geral', icon: '💳' };
     const spent = getCategoryCurrentSpending(b.categoryId, AppState.selectedYear, AppState.selectedMonth);
-    const pct = Math.min(100, Math.round((spent / b.limit) * 100));
+    const pct = b.limit > 0 ? Math.min(100, Math.round((spent / b.limit) * 100)) : 0;
     const rem = b.limit - spent;
 
     let barColor = 'bg-emerald-500';
@@ -654,20 +807,38 @@ function renderBudgetsScreen() {
 
         <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
           <span class="text-slate-400">${rem >= 0 ? `Restam ${formatCurrency(rem)}` : `Estourou em ${formatCurrency(Math.abs(rem))}`}</span>
-          <button onclick="deleteBudget('${b.id}')" class="text-rose-500 hover:text-rose-600">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <button onclick="openBudgetModal('${b.id}')" class="text-brand-600 hover:text-brand-700 dark:text-brand-400" title="Editar orçamento" aria-label="Editar orçamento de ${cat.name}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button onclick="deleteBudget('${b.id}')" class="text-rose-500 hover:text-rose-600" title="Excluir orçamento" aria-label="Excluir orçamento de ${cat.name}">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     `;
   }).join('');
 }
 
-function openBudgetModal() {
+function openBudgetModal(budgetId = null) {
+  const budget = budgetId === null
+    ? null
+    : AppState.budgets.find(item => String(item.id) === String(budgetId));
+  if (budgetId && !budget) {
+    showToast('Não foi possível localizar este orçamento.');
+    return;
+  }
+  editingBudgetId = budget ? String(budget.id) : null;
   const select = document.getElementById('budget-category-select');
   const expenseCats = AppState.categories.filter(c => c.type === 'expense');
   select.innerHTML = expenseCats.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
-  document.getElementById('budget-limit').value = '';
+  if (budget) select.value = budget.categoryId;
+  document.getElementById('budget-limit').value = budget
+    ? (Number(budget.limit) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : '';
+  document.getElementById('budget-modal-title').textContent = budget ? 'Editar Orçamento' : 'Novo Orçamento';
+  document.getElementById('budget-save-button').textContent = budget ? 'Salvar Alterações' : 'Salvar';
   document.getElementById('modal-budget').classList.remove('hidden');
 }
 
@@ -680,9 +851,27 @@ function saveBudgetFromModal() {
     return;
   }
 
+  if (editingBudgetId && !AppState.budgets.some(b => String(b.id) === editingBudgetId)) {
+    showToast('Não foi possível localizar este orçamento.');
+    return;
+  }
+
+  const duplicateBudget = AppState.budgets.find(b =>
+    b.categoryId === categoryId && String(b.id) !== editingBudgetId
+  );
+  if (duplicateBudget && editingBudgetId) {
+    showToast('Já existe um orçamento para esta categoria!');
+    return;
+  }
+
   let savedB;
-  const existingIndex = AppState.budgets.findIndex(b => b.categoryId === categoryId);
-  if (existingIndex >= 0) {
+  const editingIndex = AppState.budgets.findIndex(b => String(b.id) === editingBudgetId);
+  const existingIndex = editingBudgetId ? -1 : AppState.budgets.findIndex(b => b.categoryId === categoryId);
+  if (editingIndex >= 0) {
+    AppState.budgets[editingIndex].categoryId = categoryId;
+    AppState.budgets[editingIndex].limit = limit;
+    savedB = AppState.budgets[editingIndex];
+  } else if (existingIndex >= 0) {
     AppState.budgets[existingIndex].limit = limit;
     savedB = AppState.budgets[existingIndex];
   } else {
@@ -692,6 +881,7 @@ function saveBudgetFromModal() {
 
   persistState();
   fbSave('budgets', savedB.id, savedB);
+  editingBudgetId = null;
   closeModal('modal-budget');
   renderBudgetsScreen();
   updateDashboardMetrics();
@@ -699,9 +889,15 @@ function saveBudgetFromModal() {
 }
 
 function deleteBudget(bId) {
-  AppState.budgets = AppState.budgets.filter(b => b.id !== bId);
+  const budgetExists = AppState.budgets.some(b => String(b.id) === String(bId));
+  if (!budgetExists) {
+    showToast('Não foi possível localizar este orçamento.');
+    return;
+  }
+
+  AppState.budgets = AppState.budgets.filter(b => String(b.id) !== String(bId));
   persistState();
-  fbDelete('budgets', bId);
+  fbDelete('budgets', String(bId));
   renderBudgetsScreen();
   updateDashboardMetrics();
   showToast('Orçamento excluído!');
@@ -784,7 +980,7 @@ function renderAccountsScreen() {
   const banks = AppState.accounts.filter(a => a.type === 'bank');
   const cards = AppState.accounts.filter(a => a.type === 'card');
 
-  document.getElementById('accounts-banks-grid').innerHTML = banks.map(b => {
+  document.getElementById('accounts-banks-grid').innerHTML = banks.length ? banks.map(b => {
     const dynamicBal = getDynamicAccountBalance(b);
     return `
       <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
@@ -792,9 +988,14 @@ function renderAccountsScreen() {
           <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shadow-sm" style="background-color: ${b.color || '#3b82f6'}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/></svg>
           </div>
-          <button onclick="deleteAccount('${b.id}')" class="text-rose-500 hover:text-rose-600 text-xs">
+          <div class="flex items-center gap-2">
+          <button onclick="openAccountModal('${b.id}')" class="text-brand-500 hover:text-brand-600" title="Editar conta" aria-label="Editar conta ${b.name}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button onclick="deleteAccount('${b.id}')" class="text-rose-500 hover:text-rose-600 text-xs" title="Excluir conta" aria-label="Excluir conta ${b.name}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
+          </div>
         </div>
         <div>
           <h4 class="text-sm font-bold text-slate-900 dark:text-white">${b.name}</h4>
@@ -806,24 +1007,29 @@ function renderAccountsScreen() {
         </div>
       </div>
     `;
-  }).join('');
+  }).join('') : '<p class="col-span-full py-6 text-center text-xs text-slate-400">Nenhuma conta bancária cadastrada.</p>';
 
-  document.getElementById('accounts-cards-grid').innerHTML = cards.map(c => {
+  document.getElementById('accounts-cards-grid').innerHTML = cards.length ? cards.map(c => {
     const currentBill = getDynamicAccountBalance(c);
-    const available = c.limit - currentBill;
+    const available = (Number(c.limit) || 0) - getCardOutstandingBalance(c);
     return `
       <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
         <div class="flex items-center justify-between">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg shadow-sm" style="background-color: ${c.color || '#ea580c'}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           </div>
-          <button onclick="deleteAccount('${c.id}')" class="text-rose-500 hover:text-rose-600 text-xs">
+          <div class="flex items-center gap-2">
+          <button onclick="openAccountModal('${c.id}')" class="text-brand-500 hover:text-brand-600" title="Editar cartão" aria-label="Editar cartão ${c.name}">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button onclick="deleteAccount('${c.id}')" class="text-rose-500 hover:text-rose-600 text-xs" title="Excluir cartão" aria-label="Excluir cartão ${c.name}">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
+          </div>
         </div>
         <div>
           <h4 class="text-sm font-bold text-slate-900 dark:text-white">${c.name}</h4>
-          <p class="text-xs text-slate-400">Vencimento: Dia ${c.due || '15'}</p>
+          <p class="text-xs text-slate-400">Fechamento: Dia ${c.closingDay || c.due || '15'} · Vencimento: Dia ${c.due || '15'}</p>
         </div>
         <div class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
           <div class="flex justify-between text-xs">
@@ -837,15 +1043,37 @@ function renderAccountsScreen() {
         </div>
       </div>
     `;
-  }).join('');
+  }).join('') : '<p class="col-span-full py-6 text-center text-xs text-slate-400">Nenhum cartão de crédito cadastrado.</p>';
 }
 
-function openAccountModal() {
-  setAccountModalType('bank');
-  document.getElementById('acc-name').value = '';
-  document.getElementById('acc-balance').value = '';
-  document.getElementById('acc-limit').value = '';
-  document.getElementById('acc-bill').value = '';
+function openAccountModal(accountId = null) {
+  const account = accountId === null
+    ? null
+    : AppState.accounts.find(item => String(item.id) === String(accountId));
+  if (accountId !== null && !account) {
+    showToast('Não foi possível localizar esta conta ou cartão.');
+    return;
+  }
+
+  editingAccountId = account ? String(account.id) : null;
+  setAccountModalType(account ? account.type : 'bank');
+  document.getElementById('account-modal-title').textContent = account
+    ? account.type === 'card' ? 'Editar Cartão' : 'Editar Conta Bancária'
+    : 'Nova Conta / Cartão';
+  document.getElementById('account-save-button').textContent = account ? 'Salvar Alterações' : 'Salvar';
+  document.getElementById('account-type-selector').classList.toggle('hidden', !!account);
+  document.getElementById('acc-name').value = account?.name || '';
+  document.getElementById('acc-balance').value = account
+    ? (Number(account.initialBalance) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : '';
+  document.getElementById('acc-limit').value = account
+    ? (Number(account.limit) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : '';
+  document.getElementById('acc-bill').value = account
+    ? (Number(account.initialBill) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : '';
+  document.getElementById('acc-closing-day').value = account?.closingDay || account?.due || '';
+  document.getElementById('acc-due-day').value = account?.due || 15;
   document.getElementById('modal-account').classList.remove('hidden');
 }
 
@@ -855,6 +1083,7 @@ function setAccountModalType(t) {
   const bCard = document.getElementById('acc-type-card-btn');
   const bankBlock = document.getElementById('acc-bank-block');
   const cardBlock = document.getElementById('acc-card-block');
+  if (!bBank || !bCard || !bankBlock || !cardBlock) return;
 
   if (t === 'bank') {
     bBank.className = 'flex-1 py-1.5 rounded-lg bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm';
@@ -876,48 +1105,89 @@ function saveAccountFromModal() {
     return;
   }
 
-  let newAcc;
+  const existingAccount = editingAccountId
+    ? AppState.accounts.find(account => String(account.id) === editingAccountId)
+    : null;
+  if (editingAccountId && !existingAccount) {
+    showToast('Não foi possível localizar esta conta ou cartão.');
+    return;
+  }
+  const duplicateName = AppState.accounts.find(account =>
+    account.name.toLocaleLowerCase() === name.toLocaleLowerCase()
+      && String(account.id) !== editingAccountId
+  );
+  if (duplicateName) {
+    showToast('Já existe uma conta ou cartão com esse nome.');
+    return;
+  }
+
+  const previousName = existingAccount?.name;
+  let accountData;
   if (accModalCurrentType === 'bank') {
     const bal = parseCurrencyString(document.getElementById('acc-balance').value);
-    newAcc = {
-      id: 'acc_' + Date.now(),
+    accountData = {
       name,
       type: 'bank',
-      agency: '001',
+      agency: existingAccount?.agency || '001',
       initialBalance: bal,
-      color: '#0284c7'
+      color: existingAccount?.color || '#0284c7'
     };
   } else {
     const limit = parseCurrencyString(document.getElementById('acc-limit').value);
     const bill = parseCurrencyString(document.getElementById('acc-bill').value);
-    const due = parseInt(document.getElementById('acc-due-day').value, 10) || 15;
-    newAcc = {
-      id: 'card_' + Date.now(),
+    const closingDay = Number.parseInt(document.getElementById('acc-closing-day').value, 10);
+    const due = Number.parseInt(document.getElementById('acc-due-day').value, 10);
+    if (limit <= 0 || !Number.isInteger(closingDay) || closingDay < 1 || closingDay > 31
+      || !Number.isInteger(due) || due < 1 || due > 31) {
+      showToast('Informe um limite maior que zero e fechamento e vencimento entre 1 e 31.');
+      return;
+    }
+    accountData = {
       name,
       type: 'card',
       limit,
       initialBill: bill,
+      closingDay,
       due,
-      color: '#9333ea'
+      color: existingAccount?.color || '#9333ea'
     };
   }
 
-  AppState.accounts.push(newAcc);
+  const account = existingAccount
+    ? Object.assign(existingAccount, accountData)
+    : { id: (accModalCurrentType === 'bank' ? 'acc_' : 'card_') + Date.now(), ...accountData };
+  if (!existingAccount) AppState.accounts.push(account);
+
+  if (existingAccount && previousName !== name) {
+    AppState.transactions.forEach(tx => {
+      if (tx.bank === previousName) tx.bank = name;
+      if (tx.destinationBank === previousName) tx.destinationBank = name;
+    });
+    AppState.transactions.forEach(tx => fbSave('transactions', tx.id, tx));
+  }
+
   persistState();
-  fbSave('accounts', newAcc.id, newAcc);
+  fbSave('accounts', account.id, account);
+  editingAccountId = null;
   closeModal('modal-account');
   renderAccountsScreen();
   updateDashboardMetrics();
-  showToast('Conta cadastrada com sucesso!');
+  showToast(existingAccount ? 'Conta ou cartão atualizado com sucesso!' : 'Conta ou cartão cadastrado com sucesso!');
 }
 
 function deleteAccount(accId) {
-  AppState.accounts = AppState.accounts.filter(a => a.id !== accId);
+  const accountExists = AppState.accounts.some(account => String(account.id) === String(accId));
+  if (!accountExists) {
+    showToast('Não foi possível localizar esta conta ou cartão.');
+    return;
+  }
+
+  AppState.accounts = AppState.accounts.filter(account => String(account.id) !== String(accId));
   persistState();
-  fbDelete('accounts', accId);
+  fbDelete('accounts', String(accId));
   renderAccountsScreen();
   updateDashboardMetrics();
-  showToast('Conta removida!');
+  showToast('Conta ou cartão removido!');
 }
 
 function renderCategoriesScreen() {
@@ -967,7 +1237,13 @@ function populateSelectOptions() {
   accSelects.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.innerHTML = id === 'tx-filter-account' ? '<option value="all">Todas as Contas</option>' + accOptions : accOptions;
+      if (id === 'modal-tx-account' || id === 'drawer-account') {
+        el.innerHTML = AppState.accounts.map(account =>
+          `<option value="${String(account.id)}">${account.name}</option>`
+        ).join('');
+      } else {
+        el.innerHTML = id === 'tx-filter-account' ? '<option value="all">Todas as Contas</option>' + accOptions : accOptions;
+      }
     }
   });
 
